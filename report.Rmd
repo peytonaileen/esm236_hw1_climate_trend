@@ -1,0 +1,38 @@
+---
+title: 'Homework 1: Fun with Climate Trends!'
+author: "Peyton Moore"
+date: "4/14/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+### Introduction
+
+- description of location choosen 
+- description of data used 
+
+
+
+### Trend Analysis Results 
+
+Assess whether climate at your location has been changing with trend analysis
+- using 2 different metrics for averages
+- using 2 different metrics for extremes
+
+
+### Discussion 
+Why are these metrics likely to be relevant, given the climate change impacts you expect at this location?
+
+Use some good old T, rank-sum, or other statistical tests,
+
+
+### Citations 
+
+
+
