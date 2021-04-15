@@ -7,6 +7,16 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(lubridate)
+library(ggplot2)
+library(tidyverse)
+library(janitor)
+library(chron)
+library(lubridate)
+library(tsibble)
+library(feasts)
+library(slider)
 ```
 
 
@@ -15,7 +25,20 @@ knitr::opts_chunk$set(echo = TRUE)
 ### Introduction
 
 - description of location choosen: Cape Florida, FL 
-- description of data used 
+- description of data used : https://www.ncdc.noaa.gov/cdo-web/confirmation
+
+```{r, reading in data}
+
+
+florida <- read_csv("florida.csv") %>% 
+  clean_names() %>% 
+  mutate(date = as_date(date), 
+         year = year(date), 
+         month = month(date), 
+         day = day(date)) %>% 
+  select(date, year, month, day, prcp, tmax, tmin)
+  
+```
 
 
 
@@ -24,6 +47,37 @@ knitr::opts_chunk$set(echo = TRUE)
 Assess whether climate at your location has been changing with trend analysis
 - using 2 different metrics for averages
 - using 2 different metrics for extremes
+
+
+```{r daily plots}
+ggplot(data = florida, 
+       aes(x = date, y = tmax))+
+  geom_line()
+
+ggplot(data = florida, 
+       aes(x = date, y = tmin))+
+  geom_line()
+
+ggplot(data = florida, 
+       aes(x = date, y = prcp))+
+  geom_line()
+
+
+```
+
+
+```{r, season plots }
+
+florida_ts <- florida %>% 
+  as_tsibble(key = NULL, 
+             index = date) %>%
+  fill_gaps() %>% 
+  filter_index("1999"~"2020")
+
+gg_season(data =florida_ts, aes(y = tmax))
+
+```
+
 
 
 ### Discussion 
