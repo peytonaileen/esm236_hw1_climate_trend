@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Introduction
 
-- description of location choosen 
+- description of location choosen: Herman, MO
 - description of data used 
 
 
