@@ -89,17 +89,13 @@ florida <- read_csv("florida.csv") %>%
   
 ```
 
+---
 
-
-### Trend Analysis Results 
+### Temperature Trend Analysis 
 
 Assess whether climate at your location has been changing with trend analysis
 - using 2 different metrics for averages
 - using 2 different metrics for extremes
-
-
-
-
 
 ```{r, tsibble, include = FALSE }
 
@@ -116,6 +112,7 @@ florida_month <- florida_ts %>%
 
 ```
 
+#### **Temperature Averages**
 ```{r, annual, include = FALSE}
 fl_annual <- florida %>% 
   group_by(year) %>% 
@@ -145,10 +142,10 @@ a+
   theme_minimal()+
   labs(x = "Year", 
        y = "Average Annual Temperature (ºF)", 
-       title = "Average daily minimmum and maximum average temperatures from 1999-2020", 
+       title = "Fig 1. Average daily minimmum and maximum temperatures",
+       subtitle= "Cape Florida, FL (1999-2020)", 
        caption = "Here the average daily minimum and maximum temperatures are shown over time. \nThe red dots represent the average maximum daily temperature, and the red line is a linear trendline\n of the changes over time. The blue dots represent the average minimum daily temperature, and the blue line is a\n linear trensline representing changes over time.")
 ```
-
 
 ```{r, include = FALSE}
 library(Kendall)
@@ -177,14 +174,136 @@ t.test(subset(florida$tmin, florida$year %in% 1990:2009), subset(florida$tmin, f
 ```
 
 
+#### **Temperature Extremes**
+
+---
+
+### Precipitation Trend Analysis
+
+```{r, include = FALSE}
+fl_prcp = read.table("florida.csv",fill=TRUE,sep=',',header=T)
+head(fl_prcp)
+
+date=as.Date(fl_prcp$DATE)
+
+# find the row with missing data
+fillrow = which(is.na(fl_prcp$PRCP))
+fillrow
+fl_prcp$PRCP[fillrow]=0
+```
+
+A tropical climate dominates the southern tip of Florida, with the average rainy season in Cape Florida, FL  beginning in May  and ending around October. This can be seen in the graph below (Figure 2), Which depicts total rainfall per month from the year 1999 to 2020. Well there is an obvious seasonal trend with spikes in rainfall happening as predicted from May to October, a trend over time Is less obvious.
+
+```{r}
+fl_ts <- fl_prcp %>% 
+  mutate(date = lubridate::ymd(date)) %>% 
+  as_tsibble(key = NULL, index = date)
+
+florida_month <- fl_ts %>% 
+  index_by(yr_mo = ~yearmonth(.)) %>% 
+  summarize(monthly_mean_prcp = sum(PRCP, na.rm = TRUE)) %>% 
+  mutate(mo = month(yr_mo)) %>%
+  mutate(month = month.abb[mo]) %>% 
+  mutate(month = fct_reorder(month, mo)) %>% 
+  mutate(yr = year(yr_mo))
+
+# break it up by month: 
+florida_month %>% 
+  ggplot(aes(x = year(yr_mo), y = monthly_mean_prcp)) +
+  geom_line(color = "deepskyblue3") +
+  facet_wrap(~month(yr_mo, label = TRUE)) +
+  theme_light()+
+  labs(x = "Year",
+       y = "Monthly Rainfall (in)",
+       title = "Fig 2. Total Monthly Rainfall",
+       subtitle = "Cape Florida, FL (1999-2020)",
+       caption = "Blue lines represent monthly trends in total rainfall across two decades. Month segments highlight seasonal differences.
+       
+       ")
+```
+
+#### **Precipitation Averages**
+A simple visual assessment of average daily rainfall per year from 1999 to 2020 shows that there might be a downward trend over time (Figure 3). However, some obvious outliers make further statistical analysis necessary. 
+
+```{r}
+fl_prcp.mwy = fl_prcp %>% group_by(year(date)) %>% summarize(precip=mean(PRCP))
+fl_prcp.mwy$dt = unique(year(date)) 
+
+fl_avg_prcp <- fl_prcp.mwy%>% 
+  filter(dt %in% c(1999:2020))
+
+ggplot(fl_avg_prcp, aes(x=dt, precip))+
+  geom_point(col="deepskyblue3") +
+  stat_smooth(method="lm", col="deepskyblue3")+
+  theme_minimal() +
+  labs(x = "Year", 
+       y = "Average Rainfall (in)", 
+       title = "Fig 3. Average daily rainfall per year",
+       subtitle= "Cape Florida, FL (1999-2020)", 
+       caption = "Daily precipitation averages per year are shown over time. The blue dots represent the \naverage daily precipitation, and the blue line is a linear trendline of change over time.
+       
+       ")
+  
+```
+
+We use linear regression, Mann Kendall, and a Welch Two Sample t-test if changes in average daily precipitation over time was statistically significant.
+
+**Linear Regression** : Shows an overall insignificant trend in the data. The value of the slope (from 1999 to 2020) is -0.0005378 inches/year, and is *not* statistically significant.
+
+- *Early portion* : However, review of the early portion of the data (1999 to 2009) indicates a significant downward trend. The value of the slope is -0.005553 inches/year, and *is* statistically significant. We've included a graph of this below as it is the only significant finding from the linear regression model (Figure 4).
+- *Later portion* : Review of the later portion of the data (2010 to 2020) indicates an insignificant trend. The value of the slope is slightly positive (0.002294 inches/year), but is *not* statistically significant.
+
+```{r}
+# Linear Regressionn
+res=lm(precip~dt, data=fl_avg_prcp)
+sum_res = summary(res)
+
+# early portion
+res_early=lm(precip~dt, data=subset(fl_avg_prcp, fl_avg_prcp$dt %in% c(1999:2009)))
+sum_res_early = summary(res_early)
+ggplot(subset(fl_avg_prcp, fl_avg_prcp$dt %in% c(1999:2009)), aes(x=dt, y=precip)) +
+  stat_summary(fun.y="mean", geom="point", col="deepskyblue3", size=4)+
+  theme(axis.text=element_text(size=14, face="bold"), axis.title=element_text(size=14, face="bold")) + 
+  geom_smooth(method="lm")+
+  theme_minimal() +
+  labs(x = "Year", 
+       y = "Average Rainfall (in)", 
+       title = "Fig 4. Average daily rainfall in early study portion",
+       subtitle= "Cape Florida, FL (1999-2009)", 
+       caption = "Graph displaying average daily rainfall per year from 1999 to 2009. Linear regression \nanalysis indicates that the downward trend during this time is statistically significant.")
+
+# last decade
+res_late=lm(precip~dt, data=subset(fl_avg_prcp, fl_avg_prcp$dt %in% c(2010:2020)))
+sum_res_late = summary(res_late)
+```  
+
+**Mann Kendall** : Shows an overall insignificant trend in the data. The magnitude value (tau) is negative, but relatively small (-0.0563), and the calculated p value is insignificant (0.73508).
+```{r}
+# Mann Kendall Test
+library(Kendall)
+MK = MannKendall(fl_avg_prcp$precip)
+```
+
+**Welch Two Sample t-test** : Shows an overall insignificant trend in the data. The calculated p-value (0.8575) indicates that the differences in the means (0.140 vs. 0.138) is not significant.
+```{r}
+# Welch Two Sample t-test
+welch = t.test(subset(fl_avg_prcp$precip, fl_avg_prcp$dt %in% 1999:2009), subset(fl_avg_prcp$precip, fl_avg_prcp$dt %in% 2010:2020))
+```
 
 
 
+#### **Precipitation Extremes**
+In considering extremes in rainfall, we considered the concept of return periods (aka recurrence interval) and return levels. This allows you to calculate the chance of an extreme amount of rainfall occurring in a single year. By using a return period of 1 in daily precipitation, we are determining the change of precipitation extremes *each year*.
 
+Our analysis indicates a chance of occurrence value of 0.0767. This means that in Cape Florida there is a 7.67% chance of extreme rainfall each year.
+``` {r return period}
+fl_prcp$flood = ifelse(fl_prcp$PRCP >= 1, 1, 0)
+nyrs=length(unique(year(date)))
 
+retper=(nyrs+1)/sum(fl_prcp$flood,na.rm=TRUE)
+```
 
-
-
+---
 
 ### Discussion 
 Why are these metrics likely to be relevant, given the climate change impacts you expect at this location?
