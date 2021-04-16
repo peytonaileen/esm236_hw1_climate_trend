@@ -32,9 +32,8 @@ library(here)
 
 ### Introduction
 
-Here we will investigating changing climatic trends from 1999-2000 in Cape Florida, FL. - high risk 
-- miami dade county 
-- cite paper everglades 
+Here we will investigating changing climatic trends from 1999-2000 in Cape Florida, FL. Cape Florida is located on the east coast of southern Florida in Miami-Dade county as shown in the map below. This area is adjacent to the Everglades, and is defined by its low elevation and subtropical climate. This unique marsh like ecosystem is the largest wilderness east of the Mississippi River and is hope to dozens of endangered species (epa.gov). Beyond its ecological importance, this area is also densely populated with more than 8 million residents in southern Florida alone (the guardian). Due to this unique combination of environmental and social factors, south Florida stands to endure some of the most dramatic impacts of climate change in the world. These impacts include: sea level rise, water contamination, increased storm frequency and severity, wildlife and habitat loss, coastal erosion, climate gentrification, and many more (the Guardian). This analysis will use climate data from the National Oceanic and Atmospheric Administration’s Climate Data Online to investigate changes in temperature and precipitation from 2000-2020 in hopes of uncovering trends and extremes that can potentially indicate what is to come for this region.  (https://www.ncdc.noaa.gov/cdo-web/confirmation). 
+
 
 ```{r, cape florida map, include = FALSE}
 cape <- data.frame(
@@ -70,11 +69,8 @@ cape_map %>%
 
 ```
 
-
-
-
-- description of location choosen: Cape Florida, FL 
-- description of data used : https://www.ncdc.noaa.gov/cdo-web/confirmation
+ 
+- description of data used https://www.ncdc.noaa.gov/cdo-web/confirmation
 
 ```{r, reading in data}
 
@@ -85,7 +81,8 @@ florida <- read_csv("florida.csv") %>%
          year = year(date), 
          month = month(date), 
          day = day(date)) %>% 
-  select(date, year, month, day, prcp, tmax, tmin)
+  select(date, year, month, day, prcp, tmax, tmin) %>% 
+  filter(year %in% 2000:2020)
   
 ```
 
@@ -93,9 +90,7 @@ florida <- read_csv("florida.csv") %>%
 
 ### Temperature Trend Analysis 
 
-Assess whether climate at your location has been changing with trend analysis
-- using 2 different metrics for averages
-- using 2 different metrics for extremes
+To understand trends in temperature, we analyzed both daily maximum temperatures and daily minimum temperatures. As shown in Figure 1, both daily minimum and maximum temperatures appear to be steadily increasing over time. Additionally, this relationship appears to be statistically significant. A Mann Kendall test returned a significant p-value of 2.22e-16 for both minimum and maximum daily temperature. A paired t-test comparing 2000-2010 to 2011-2020 also determined a statistically significant difference in the mean minimum temperatures for the two time periods (p-value = 2.358e-14). There is also a statistically significant difference in the average daily maximum temperatures for the two time periods. 
 
 ```{r, tsibble, include = FALSE }
 
@@ -143,7 +138,7 @@ a+
   labs(x = "Year", 
        y = "Average Annual Temperature (ºF)", 
        title = "Fig 1. Average daily minimmum and maximum temperatures",
-       subtitle= "Cape Florida, FL (1999-2020)", 
+       subtitle= "Cape Florida, FL (2000-2020)", 
        caption = "Here the average daily minimum and maximum temperatures are shown over time. \nThe red dots represent the average maximum daily temperature, and the red line is a linear trendline\n of the changes over time. The blue dots represent the average minimum daily temperature, and the blue line is a\n linear trensline representing changes over time.")
 ```
 
@@ -157,9 +152,10 @@ MannKendall(florida$tmax)
 #tau = 0.122, 2-sided pvalue =< 2.22e-16
 
 
-t.test(subset(florida$tmin, florida$year %in% 1990:2009), subset(florida$tmin, florida$year %in% 2010:2020))
+t.test(subset(florida$tmin, florida$year %in% 2000:2009), subset(florida$tmin, florida$year %in% 2010:2020))
 
 
+t.test(subset(florida$tmax, florida$year %in% 2000:2009), subset(florida$tmax, florida$year %in% 2010:2020))
 # data:  subset(florida$tmin, florida$year %in% 1990:2009) and subset(florida$tmin, florida$year %in% 2010:2020)
 # t = -7.6443, df = 7602.3, p-value = 2.358e-14
 # alternative hypothesis: true difference in means is not equal to 0
@@ -175,6 +171,26 @@ t.test(subset(florida$tmin, florida$year %in% 1990:2009), subset(florida$tmin, f
 
 
 #### **Temperature Extremes**
+
+Florida is a subtropical climate, and therefore experienced no days of extreme cold within the study period (with 36ºF being the lowest recorded temperature). There are however many hot days with days ranging from 91ºF to 96ºF as shown in Figure 2. There is also a 1.8% chance of temperatures above 90ºF. 
+```{r, extremes analysis, include = TRUE}
+florida_hot <- florida %>%
+  group_by(year)%>%
+  summarize(hotday =max(tmax, na.rm = TRUE))
+
+
+ggplot(florida_hot, aes(year, hotday))+geom_point(col = "orangered", alpha = 0.5)+labs(y="Hottest Day in the Year (ºF)", x = "Year", title = "Hottest days of the year in Cape Flordia 2000-2020")+
+  theme_minimal()
+```
+
+```{r return period }
+florida$hot = ifelse(florida$tmax >= 90, 1, 0)
+
+nyrs=length(unique(florida$year))
+
+retper=(nyrs+1)/sum(florida$hot,na.rm=TRUE)
+
+```
 
 ---
 
