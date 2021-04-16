@@ -1,12 +1,15 @@
 ---
 title: 'Homework 1: Fun with Climate Trends!'
-author: "Peyton Moore"
+author: "Peyton Moore & Zoe Durken-Salm"
 date: "4/14/2021"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
+    theme: cosmo
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 library(lubridate)
 library(ggplot2)
@@ -17,12 +20,58 @@ library(lubridate)
 library(tsibble)
 library(feasts)
 library(slider)
+library(tmap)
+library(leaflet)
+library(leaflet.esri)
+library(sf)
+library(here)
 ```
 
 
 
 
 ### Introduction
+
+Here we will investigating changing climatic trends from 1999-2000 in Cape Florida, FL. - high risk 
+- miami dade county 
+- cite paper everglades 
+
+```{r, cape florida map, include = FALSE}
+cape <- data.frame(
+  site = c("Cape Florida"), 
+  lat = c(25.6683433), 
+  long = c(-80.1573228)
+)
+
+florida_map <- st_read(here::here("data", "florida_counties"), layer = "united_states_florida_administrative_boundaries_level6_counties_polygon")
+
+
+tmap_mode("view")
+
+counties_map <- tm_shape(florida_map)+
+  tm_fill("name", 
+          alpha = 0.35, 
+          legend.show = FALSE)
+
+cape_map <- tmap_leaflet(counties_map)
+```
+
+```{r, final map, include = TRUE}
+cape_map %>% 
+  leaflet::addCircleMarkers(data = cape, 
+                                               lng = ~long, 
+                                               lat = ~lat, 
+                                               label = c("Cape Florida"), 
+                                               color = "orange", 
+                                               labelOptions = labelOptions(noHide = T, 
+                                               textsize = "15px")) %>% 
+  addTiles() %>% 
+  addEsriBasemapLayer(esriBasemapLayers$Imagery)
+
+```
+
+
+
 
 - description of location choosen: Cape Florida, FL 
 - description of data used : https://www.ncdc.noaa.gov/cdo-web/confirmation
@@ -49,34 +98,91 @@ Assess whether climate at your location has been changing with trend analysis
 - using 2 different metrics for extremes
 
 
-```{r daily plots}
-ggplot(data = florida, 
-       aes(x = date, y = tmax))+
-  geom_line()
-
-ggplot(data = florida, 
-       aes(x = date, y = tmin))+
-  geom_line()
-
-ggplot(data = florida, 
-       aes(x = date, y = prcp))+
-  geom_line()
 
 
-```
 
-
-```{r, season plots }
+```{r, tsibble, include = FALSE }
 
 florida_ts <- florida %>% 
   as_tsibble(key = NULL, 
-             index = date) %>%
-  fill_gaps() %>% 
-  filter_index("1999"~"2020")
+              index = date)
 
-gg_season(data =florida_ts, aes(y = tmax))
+
+
+florida_month <- florida_ts %>%  
+  index_by(yr_mo = ~yearmonth(.)) %>% 
+  summarize(monthly_mean_temp = mean(tmax, na.rm = TRUE))
+
 
 ```
+
+```{r, annual, include = FALSE}
+fl_annual <- florida %>% 
+  group_by(year) %>% 
+  summarize(mean_max = mean(tmax, na.rm = TRUE), 
+            mean_min = mean(tmin, na.rm = TRUE))
+
+a = ggplot(fl_annual,
+           aes(x=year, mean_max))+
+  geom_point(col="orangered", alpha = 0.5)+
+  scale_y_continuous(limits=c(min(fl_annual$mean_min),
+                              max(fl_annual$mean_max)))+
+geom_point(data=fl_annual, aes(x=year, mean_min), col="lightseagreen", alpha = 0.5)
+
+a
+
+a =a+stat_smooth(method="lm", col="orangered")
+a
+
+```
+
+```{r, annual final graph, include = TRUE}
+
+a+ 
+  stat_smooth(data=fl_annual,
+               aes(x=year,mean_min),
+               col="light seagreen", method="lm")+
+  theme_minimal()+
+  labs(x = "Year", 
+       y = "Average Annual Temperature (ºF)", 
+       title = "Average daily minimmum and maximum average temperatures from 1999-2020", 
+       caption = "Here the average daily minimum and maximum temperatures are shown over time. \nThe red dots represent the average maximum daily temperature, and the red line is a linear trendline\n of the changes over time. The blue dots represent the average minimum daily temperature, and the blue line is a\n linear trensline representing changes over time.")
+```
+
+
+```{r, include = FALSE}
+library(Kendall)
+
+MannKendall(florida$tmin)
+#tau = 0.106, 2-sided pvalue =< 2.22e-16
+
+MannKendall(florida$tmax)
+#tau = 0.122, 2-sided pvalue =< 2.22e-16
+
+
+t.test(subset(florida$tmin, florida$year %in% 1990:2009), subset(florida$tmin, florida$year %in% 2010:2020))
+
+
+# data:  subset(florida$tmin, florida$year %in% 1990:2009) and subset(florida$tmin, florida$year %in% 2010:2020)
+# t = -7.6443, df = 7602.3, p-value = 2.358e-14
+# alternative hypothesis: true difference in means is not equal to 0
+# 95 percent confidence interval:
+#  -1.871952 -1.107829
+# sample estimates:
+# mean of x mean of y 
+#  71.38860  72.87849 
+
+
+
+```
+
+
+
+
+
+
+
+
 
 
 

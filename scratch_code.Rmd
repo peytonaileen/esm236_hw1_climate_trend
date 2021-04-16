@@ -1,0 +1,84 @@
+---
+title: "Scratch Code"
+author: "Peyton Moore"
+date: "4/16/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r daily plots, include = FALSE}
+
+# Data exploration
+ggplot(data = florida, 
+       aes(x = date, y = tmax))+
+  geom_line()
+
+ggplot(data = florida, 
+       aes(x = date, y = tmin))+
+  geom_line()
+
+ggplot(data = florida, 
+       aes(x = date, y = prcp))+
+  geom_line()
+
+
+florida_month %>% 
+  ggplot(aes(x = yr_mo, y = monthly_mean_temp))+
+  geom_line()
+
+ggplot(data = florida_ts, aes(x = date, y = tmax))+
+  geom_line()
+
+```
+
+
+```{r subseting }
+
+# mean_temp <- mean(florida_month$monthly_mean_temp, na.rm = TRUE)
+# 
+# fl_filled <- florida_month %>% 
+#   mutate(monthly_mean_temp= replace_na(monthly_mean_temp, mean_temp)) %>% 
+#   as_tibble(key = NULL, 
+#             index = yr_mo)
+# 
+# 
+# 
+# 
+# 
+# fl_decomp <- fl_filled%>% 
+#   model(STL(monthly_mean_temp ~ season(window = Inf)))
+# 
+# head(fl_decomp)
+# 
+# components(fl_decomp) %>% 
+#   autoplot()
+
+```
+
+
+
+```{r, season plots that also}
+
+# 
+# florida_season <- florida_ts %>%
+#   filter(year(date) >1998) %>%
+#   fill_gaps() %>%
+#   select(date, tmax)
+# 
+# has_gaps(florida_season)
+
+# florida_season$tmax <- unlist(florida_season$tmax)
+# florida_season$date <- unlist(florida_season$date)
+
+# 
+# florida_season %>%
+#   as_tsibble(index = date)
+
+#gg_season(data =fl_filled, aes(y = monthly_mean_temp))
+
+```
