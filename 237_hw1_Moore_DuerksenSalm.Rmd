@@ -1,0 +1,350 @@
+---
+title: 'Homework 1: Fun with Climate Trends!'
+author: "Peyton Moore & Zoe Durken-Salm"
+date: "4/16/2021"
+output: 
+  html_document:
+    code_folding: hide
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(lubridate)
+library(ggplot2)
+library(tidyverse)
+library(janitor)
+library(chron)
+library(lubridate)
+library(tsibble)
+library(feasts)
+library(slider)
+library(tmap)
+library(leaflet)
+library(leaflet.esri)
+library(sf)
+library(here)
+```
+
+
+
+
+### Introduction
+
+Here we will investigate changing climatic trends from 1999 to 2020 in Cape Florida, FL. Cape Florida is located on the east coast of southern Florida in Miami-Dade County as shown in the map below. This area is adjacent to the Everglades, and is defined by its low elevation and subtropical climate. This unique marsh-like ecosystem is the largest wilderness east of the Mississippi River and is home to dozens of endangered species. ^[1](https://www.epa.gov/everglades/why-it-important-restore-everglades#:~:text=Recognized%20worldwide%20as%20a%20unique,wilderness%20in%20the%20United%20States)^ Beyond its ecological importance, this area is also densely populated with more than 8 million residents in southern Florida alone. ^[2](https://www.theguardian.com/environment/2020/apr/21/florida-climate-crisis-sea-level-habitat-loss)^ Due to this unique combination of environmental and social factors, south Florida stands to endure some of the most dramatic impacts of climate change in the world. These impacts include: sea level rise, water contamination, increased storm frequency and severity, wildlife and habitat loss, coastal erosion, climate gentrification, and many more.^[2](https://www.theguardian.com/environment/2020/apr/21/florida-climate-crisis-sea-level-habitat-loss)^ This analysis will use climate data from the National Oceanic and Atmospheric Administration’s Climate Data Online to investigate changes in temperature and precipitation from 2000-2020 in hopes of uncovering trends and extremes that can potentially indicate what is to come for this region.^[3](https://www.ncdc.noaa.gov/cdo-web/confirmation)^
+
+
+```{r, cape florida map, include = FALSE}
+cape <- data.frame(
+  site = c("Cape Florida"), 
+  lat = c(25.6683433), 
+  long = c(-80.1573228)
+)
+
+florida_map <- st_read(here::here("data", "florida_counties"), layer = "united_states_florida_administrative_boundaries_level6_counties_polygon")
+
+
+tmap_mode("view")
+
+counties_map <- tm_shape(florida_map)+
+  tm_fill("name", 
+          alpha = 0.35, 
+          legend.show = FALSE)
+
+cape_map <- tmap_leaflet(counties_map)
+```
+
+```{r, final map, include = TRUE}
+cape_map %>% 
+  leaflet::addCircleMarkers(data = cape, 
+                                               lng = ~long, 
+                                               lat = ~lat, 
+                                               label = c("Cape Florida"), 
+                                               color = "orange", 
+                                               labelOptions = labelOptions(noHide = T, 
+                                               textsize = "15px")) %>% 
+  addTiles() %>% 
+  addEsriBasemapLayer(esriBasemapLayers$Imagery)
+
+```
+
+ 
+- description of data used https://www.ncdc.noaa.gov/cdo-web/confirmation
+
+```{r, reading in data}
+
+
+florida <- read_csv("florida.csv") %>% 
+  clean_names() %>% 
+  mutate(date = as_date(date), 
+         year = year(date), 
+         month = month(date), 
+         day = day(date)) %>% 
+  select(date, year, month, day, prcp, tmax, tmin) %>% 
+  filter(year %in% 2000:2020)
+  
+```
+
+---
+
+### Temperature Trend Analysis 
+
+To understand trends in temperature, we analyzed both daily maximum temperatures and daily minimum temperatures. As shown in Figure 1, both daily minimum and maximum temperatures appear to be steadily increasing over time. Additionally, this relationship appears to be statistically significant. A Mann Kendall test returned a significant p-value of 2.22e-16 for both minimum and maximum daily temperature. A paired t-test comparing 2000-2010 to 2011-2020 also determined a statistically significant difference in the mean minimum temperatures for the two time periods (p-value = 2.358e-14). There is also a statistically significant difference in the average daily maximum temperatures for the two time periods. 
+
+```{r, tsibble, include = FALSE }
+
+florida_ts <- florida %>% 
+  as_tsibble(key = NULL, 
+              index = date)
+
+
+
+florida_month <- florida_ts %>%  
+  index_by(yr_mo = ~yearmonth(.)) %>% 
+  summarize(monthly_mean_temp = mean(tmax, na.rm = TRUE))
+
+
+```
+
+```{r}
+#code spacer
+```
+
+#### **Temperature Averages**
+```{r, annual, include = FALSE}
+fl_annual <- florida %>% 
+  group_by(year) %>% 
+  summarize(mean_max = mean(tmax, na.rm = TRUE), 
+            mean_min = mean(tmin, na.rm = TRUE))
+
+a = ggplot(fl_annual,
+           aes(x=year, mean_max))+
+  geom_point(col="orangered", alpha = 0.5)+
+  scale_y_continuous(limits=c(min(fl_annual$mean_min),
+                              max(fl_annual$mean_max)))+
+geom_point(data=fl_annual, aes(x=year, mean_min), col="lightseagreen", alpha = 0.5)
+
+a
+
+a =a+stat_smooth(method="lm", col="orangered")
+a
+
+```
+
+```{r, annual final graph, include = TRUE}
+
+a+ 
+  stat_smooth(data=fl_annual,
+               aes(x=year,mean_min),
+               col="light seagreen", method="lm")+
+  theme_minimal()+
+  labs(x = "Year", 
+       y = "Average Annual Temperature (ºF)", 
+       title = "Fig 1. Average daily minimmum and maximum temperatures",
+       subtitle= "Cape Florida, FL (2000-2020)", 
+       caption = "Here the average daily minimum and maximum temperatures are shown over time. \nThe red dots represent the average maximum daily temperature, and the red line is a linear trendline\n of the changes over time. The blue dots represent the average minimum daily temperature, and the blue line is a\n linear trensline representing changes over time.")
+```
+
+```{r, include = FALSE}
+library(Kendall)
+
+MannKendall(florida$tmin)
+#tau = 0.106, 2-sided pvalue =< 2.22e-16
+
+MannKendall(florida$tmax)
+#tau = 0.122, 2-sided pvalue =< 2.22e-16
+
+
+t.test(subset(florida$tmin, florida$year %in% 2000:2009), subset(florida$tmin, florida$year %in% 2010:2020))
+
+
+t.test(subset(florida$tmax, florida$year %in% 2000:2009), subset(florida$tmax, florida$year %in% 2010:2020))
+# data:  subset(florida$tmin, florida$year %in% 1990:2009) and subset(florida$tmin, florida$year %in% 2010:2020)
+# t = -7.6443, df = 7602.3, p-value = 2.358e-14
+# alternative hypothesis: true difference in means is not equal to 0
+# 95 percent confidence interval:
+#  -1.871952 -1.107829
+# sample estimates:
+# mean of x mean of y 
+#  71.38860  72.87849 
+
+
+
+```
+
+
+#### **Temperature Extremes**
+Florida is a subtropical climate, and therefore experienced no days of extreme cold within the study period (with 36ºF being the lowest recorded temperature). There are however many hot days with days ranging from 91ºF to 96ºF as shown in Figure 2. There is also a 1.8% chance of temperatures above 90ºF. 
+```{r, extremes analysis, include = TRUE}
+florida_hot <- florida %>%
+  group_by(year)%>%
+  summarize(hotday =max(tmax, na.rm = TRUE))
+
+
+ggplot(florida_hot, aes(year, hotday))+geom_point(col = "orangered", alpha = 0.5)+labs(y="Hottest Day in the Year (ºF)", x = "Year", title = "Hottest days of the year in Cape Flordia 2000-2020")+
+  theme_minimal()
+```
+
+```{r}
+florida$hot = ifelse(florida$tmax >= 90, 1, 0)
+
+nyrs=length(unique(florida$year))
+
+retper=(nyrs+1)/sum(florida$hot,na.rm=TRUE)
+
+```
+
+---
+
+### Precipitation Trend Analysis
+
+```{r, include = FALSE}
+fl_prcp = read.table("florida.csv",fill=TRUE,sep=',',header=T)
+head(fl_prcp)
+
+date=as.Date(fl_prcp$DATE)
+
+# find the row with missing data
+fillrow = which(is.na(fl_prcp$PRCP))
+fillrow
+fl_prcp$PRCP[fillrow]=0
+```
+
+A tropical climate dominates the southern tip of Florida, with the average rainy season in Cape Florida, FL  beginning in May  and ending around October. This can be seen in the graph below (Figure 2), Which depicts total rainfall per month from the year 1999 to 2020. Well there is an obvious seasonal trend with spikes in rainfall happening as predicted from May to October, a trend over time Is less obvious.
+
+```{r}
+fl_ts <- fl_prcp %>% 
+  mutate(date = lubridate::ymd(date)) %>% 
+  as_tsibble(key = NULL, index = date)
+
+florida_month <- fl_ts %>% 
+  index_by(yr_mo = ~yearmonth(.)) %>% 
+  summarize(monthly_mean_prcp = sum(PRCP, na.rm = TRUE)) %>% 
+  mutate(mo = month(yr_mo)) %>%
+  mutate(month = month.abb[mo]) %>% 
+  mutate(month = fct_reorder(month, mo)) %>% 
+  mutate(yr = year(yr_mo))
+
+# break it up by month: 
+florida_month %>% 
+  ggplot(aes(x = year(yr_mo), y = monthly_mean_prcp)) +
+  geom_line(color = "deepskyblue3") +
+  facet_wrap(~month(yr_mo, label = TRUE)) +
+  theme_light()+
+  labs(x = "Year",
+       y = "Monthly Rainfall (in)",
+       title = "Fig 2. Total Monthly Rainfall",
+       subtitle = "Cape Florida, FL (1999-2020)",
+       caption = "Blue lines represent monthly trends in total rainfall across two decades. Month segments highlight seasonal differences.
+       
+       ")
+```
+
+#### **Precipitation Averages**
+A simple visual assessment of average daily rainfall per year from 1999 to 2020 shows that there might be a downward trend over time (Figure 3). However, some obvious outliers make further statistical analysis necessary. 
+
+```{r}
+fl_prcp.mwy = fl_prcp %>% group_by(year(date)) %>% summarize(precip=mean(PRCP))
+fl_prcp.mwy$dt = unique(year(date)) 
+
+fl_avg_prcp <- fl_prcp.mwy%>% 
+  filter(dt %in% c(1999:2020))
+
+ggplot(fl_avg_prcp, aes(x=dt, precip))+
+  geom_point(col="deepskyblue3") +
+  stat_smooth(method="lm", col="deepskyblue3")+
+  theme_minimal() +
+  labs(x = "Year", 
+       y = "Average Rainfall (in)", 
+       title = "Fig 3. Average daily rainfall per year",
+       subtitle= "Cape Florida, FL (1999-2020)", 
+       caption = "Daily precipitation averages per year are shown over time. The blue dots represent the \naverage daily precipitation, and the blue line is a linear trendline of change over time.
+       
+       ")
+  
+```
+
+We use linear regression, Mann Kendall, and a Welch Two Sample t-test if changes in average daily precipitation over time was statistically significant.
+
+**Linear Regression** : Shows an overall insignificant trend in the data. The value of the slope (from 1999 to 2020) is -0.0005378 inches/year, and is *not* statistically significant.
+
+- *Early portion* : However, review of the early portion of the data (1999 to 2009) indicates a significant downward trend. The value of the slope is -0.005553 inches/year, and *is* statistically significant. We've included a graph of this below as it is the only significant finding from the linear regression model (Figure 4).
+- *Later portion* : Review of the later portion of the data (2010 to 2020) indicates an insignificant trend. The value of the slope is slightly positive (0.002294 inches/year), but is *not* statistically significant.
+
+```{r}
+# Linear Regressionn
+res=lm(precip~dt, data=fl_avg_prcp)
+sum_res = summary(res)
+
+# early portion
+res_early=lm(precip~dt, data=subset(fl_avg_prcp, fl_avg_prcp$dt %in% c(1999:2009)))
+sum_res_early = summary(res_early)
+ggplot(subset(fl_avg_prcp, fl_avg_prcp$dt %in% c(1999:2009)), aes(x=dt, y=precip)) +
+  stat_summary(fun.y="mean", geom="point", col="deepskyblue3", size=4)+
+  theme(axis.text=element_text(size=14, face="bold"), axis.title=element_text(size=14, face="bold")) + 
+  geom_smooth(method="lm")+
+  theme_minimal() +
+  labs(x = "Year", 
+       y = "Average Rainfall (in)", 
+       title = "Fig 4. Average daily rainfall in early study portion",
+       subtitle= "Cape Florida, FL (1999-2009)", 
+       caption = "Graph displaying average daily rainfall per year from 1999 to 2009. Linear regression \nanalysis indicates that the downward trend during this time is statistically significant.")
+
+# last decade
+res_late=lm(precip~dt, data=subset(fl_avg_prcp, fl_avg_prcp$dt %in% c(2010:2020)))
+sum_res_late = summary(res_late)
+```  
+
+**Mann Kendall** : Shows an overall insignificant trend in the data. The magnitude value (tau) is negative, but relatively small (-0.0563), and the calculated p value is insignificant (0.73508).
+```{r}
+# Mann Kendall Test
+library(Kendall)
+MK = MannKendall(fl_avg_prcp$precip)
+```
+
+**Welch Two Sample t-test** : Shows an overall insignificant trend in the data. The calculated p-value (0.8575) indicates that the differences in the means (0.140 vs. 0.138) is not significant.
+```{r}
+# Welch Two Sample t-test
+welch = t.test(subset(fl_avg_prcp$precip, fl_avg_prcp$dt %in% 1999:2009), subset(fl_avg_prcp$precip, fl_avg_prcp$dt %in% 2010:2020))
+```
+
+
+
+#### **Precipitation Extremes**
+In considering extremes in rainfall, we considered the concept of return periods (aka recurrence interval) and return levels. This allows you to calculate the chance of an extreme amount of rainfall occurring in a single year. By using a return period of 1 in daily precipitation, we are determining the change of precipitation extremes *each year*.
+
+Our analysis indicates a chance of occurrence value of 0.0767. This means that in Cape Florida there is a 7.67% chance of extreme rainfall each year.
+``` {r return period}
+fl_prcp$flood = ifelse(fl_prcp$PRCP >= 1, 1, 0)
+nyrs=length(unique(year(date)))
+
+retper=(nyrs+1)/sum(fl_prcp$flood,na.rm=TRUE)
+```
+
+---
+
+### Discussion 
+
+Our results indicate that warming temperatures are the most significant change in climate that’s occurred over the last twenty years in Cape Florida, FL. This is no surprise, as over the last century Florida has warmed by more than one degree (F), and continued warming is expected.^[4](https://www.epa.gov/sites/production/files/2016-08/documents/climate-change-fl.pdf)^ 
+
+1. Surprisingly, our statistical analysis found that trends in average daily precipitation and minimum average temperatures are not statistically significant. However, the general consensus from the scientific community makes us question our precipitation results. In 2016, The EPA claimed that “tropical storms and hurricanes have become more intense” over the last 20 years.^[4](https://www.epa.gov/sites/production/files/2016-08/documents/climate-change-fl.pdf)^  While this claim doesn’t seem to fit with our findings, we offer two potential reasons for this discrepancy:
+
+2. Storm season in Florida is from June to November.^[5](https://www.baynews9.com/fl/tampa/weather/2021/04/14/is-your-name-on-the-list--2021-atlantic-hurricane-season-names)^ During these times, increased rainfall is expected, but it is possible that the trends during the offseason months in our data is skewing the significance results. Future analysis should consider the difference and averages in extremes between  storm season and offseason. 
+Our linear regression analysis of the years 2010 to 2020, although not significant, indicated a slight upward slope in precipitation averages (as compared to the significant downward trend from 1999-2009). In a couple of years, with increasing warming in the region, it is possible that this value could become statistically significant.
+
+Given our results indicating significant upward trends in temperature and potential increases in storm events and rainfall, paired with information provided from the scientific community, it is obvious that Florida is already experiencing severe impacts from climate change.
+
+---
+
+### Citations 
+
+1. EPA (2020). Why is it Important to Restore the Everglades? [EPA.gov](https://www.epa.gov/everglades/why-it-important-restore-everglades#:~:text=Recognized%20worldwide%20as%20a%20unique,wilderness%20in%20the%20United%20States).
+
+2. The Guardian. (2020). Will Florida be lost forever to the climate crisis? [TheGuardian.com](https://www.theguardian.com/environment/2020/apr/21/florida-climate-crisis-sea-level-habitat-loss).
+
+3. NOAA National Centers for Environmental Information. (2021). Climate Data Online Search. [NRDC.NOAA.gov](https://www.ncdc.noaa.gov/cdo-web/confirmation).
+
+4. EPA. (2016). What Climate Change Means for Florida. [EPA.GOV](https://www.epa.gov/sites/production/files/2016-08/documents/climate-change-fl.pdf).
+
+5. Merianos, Nick. (2021). Is your name on the list? 2021 Atlantic hurricane season names. [BayNews9.com](https://www.baynews9.com/fl/tampa/weather/2021/04/14/is-your-name-on-the-list--2021-atlantic-hurricane-season-names).
